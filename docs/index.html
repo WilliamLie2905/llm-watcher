@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LLM Channel Watcher</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: system-ui, sans-serif; background: #0f0f0f; color: #e0e0e0; padding: 24px; }
+    h1 { font-size: 24px; margin-bottom: 8px; color: #fff; }
+    p.sub { color: #888; margin-bottom: 24px; font-size: 14px; }
+    .filters { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
+    input, select {
+      background: #1a1a1a; border: 1px solid #333; color: #e0e0e0;
+      padding: 8px 12px; border-radius: 6px; font-size: 14px;
+    }
+    input { width: 280px; }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    th {
+      text-align: left; padding: 10px 12px;
+      background: #1a1a1a; color: #888;
+      border-bottom: 1px solid #333;
+      position: sticky; top: 0;
+    }
+    td { padding: 10px 12px; border-bottom: 1px solid #1e1e1e; vertical-align: top; }
+    tr:hover td { background: #161616; }
+    a { color: #4a9eff; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .tag {
+      display: inline-block; background: #1e2a3a; color: #4a9eff;
+      padding: 2px 8px; border-radius: 4px; font-size: 12px; margin: 2px;
+    }
+    .channel { color: #a78bfa; font-weight: 500; }
+    .summary { color: #aaa; font-size: 13px; line-height: 1.5; }
+    .claims { color: #f0a; font-size: 12px; margin-top: 4px; }
+    .mentions { color: #4ade80; font-size: 12px; margin-top: 4px; }
+    .date { color: #666; font-size: 12px; white-space: nowrap; }
+    #count { color: #666; font-size: 13px; margin-bottom: 12px; }
+    .empty { text-align: center; padding: 60px; color: #555; }
+  </style>
+</head>
+<body>
+  <h1>LLM Channel Watcher</h1>
+  <p class="sub">Auto-updated table of LLM videos — transcribed and summarised by AI</p>
+
+  <div class="filters">
+    <input type="text" id="search" placeholder="Search titles, topics, summaries...">
+    <select id="channelFilter">
+      <option value="">All channels</option>
+    </select>
+  </div>
+
+  <div id="count"></div>
+  <table>
+    <thead>
+      <tr>
+        <th>Video</th>
+        <th>Channel</th>
+        <th>Topics</th>
+        <th>Summary / Claims</th>
+        <th>Mentions</th>
+        <th>Date</th>
+      </tr>
+    </thead>
+    <tbody id="tbody"></tbody>
+  </table>
+
+  <script>
+    let allVideos = [];
+
+    fetch("videos.json")
+      .then(r => r.json())
+      .then(data => {
+        allVideos = data;
+        populateChannelFilter(data);
+        render(data);
+      })
+      .catch(() => {
+        document.getElementById("tbody").innerHTML =
+          '<tr><td colspan="6" class="empty">No data yet — run watcher.py first</td></tr>';
+      });
+
+    function populateChannelFilter(data) {
+      const channels = [...new Set(data.map(v => v.channel))].sort();
+      const sel = document.getElementById("channelFilter");
+      channels.forEach(ch => {
+        const opt = document.createElement("option");
+        opt.value = ch; opt.textContent = ch;
+        sel.appendChild(opt);
+      });
+    }
+
+    function render(data) {
+      const tbody = document.getElementById("tbody");
+      document.getElementById("count").textContent = `Showing ${data.length} videos`;
+
+      if (data.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="empty">No matching videos</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = data.map(v => {
+        const topics = v.topics
+          ? v.topics.split(",").map(t =>
+              `<span class="tag">${t.trim()}</span>`).join("")
+          : "";
+        const date = v.published
+          ? new Date(v.published).toLocaleDateString("en-GB", {
+              day: "numeric", month: "short", year: "numeric"
+            })
+          : "";
+        return `
+          <tr>
+            <td><a href="${v.url}" target="_blank">${v.title}</a></td>
+            <td><span class="channel">${v.channel}</span></td>
+            <td>${topics}</td>
+            <td>
+              <div class="summary">${v.summary || ""}</div>
+              ${v.claims ? `<div class="claims">⚡ ${v.claims}</div>` : ""}
+            </td>
+            <td><span class="mentions">${v.mentions || ""}</span></td>
+            <td><span class="date">${date}</span></td>
+          </tr>`;
+      }).join("");
+    }
+
+    function filter() {
+      const q = document.getElementById("search").value.toLowerCase();
+      const ch = document.getElementById("channelFilter").value;
+      const filtered = allVideos.filter(v => {
+        const matchChannel = !ch || v.channel === ch;
+        const matchSearch = !q || [v.title, v.topics, v.summary, v.claims, v.mentions]
+          .some(f => f && f.toLowerCase().includes(q));
+        return matchChannel && matchSearch;
+      });
+      render(filtered);
+    }
+
+    document.getElementById("search").addEventListener("input", filter);
+    document.getElementById("channelFilter").addEventListener("change", filter);
+  </script>
+</body>
+</html>
