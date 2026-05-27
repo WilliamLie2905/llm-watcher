@@ -23,7 +23,7 @@ def init_db():
 def is_seen(video_id):
     conn = sqlite3.connect("videos.db")
     c = conn.cursor()
-    c.execute("SELECT 1 FROM videos WHERE video_id = ?", (video_id,))
+    c.execute("SELECT 1 FROM videos WHERE video_id = ? AND processed = 1", (video_id,))
     result = c.fetchone()
     conn.close()
     return result is not None
@@ -48,6 +48,26 @@ def update_video(video_id, transcript, topics, summary, claims, mentions):
     """, (transcript, topics, summary, claims, mentions, video_id))
     conn.commit()
     conn.close()
+
+def get_unprocessed_with_transcripts():
+    conn = sqlite3.connect("videos.db")
+    c = conn.cursor()
+    c.execute("""
+        SELECT video_id, title, channel_name, transcript
+        FROM videos
+        WHERE processed = 0 AND transcript != ''
+    """)
+    rows = c.fetchall()
+    conn.close()
+    return rows
+
+def get_transcript(video_id):
+    conn = sqlite3.connect("videos.db")
+    c = conn.cursor()
+    c.execute("SELECT transcript FROM videos WHERE video_id = ? AND transcript != ''", (video_id,))
+    row = c.fetchone()
+    conn.close()
+    return row[0] if row else None
 
 def get_all_videos():
     conn = sqlite3.connect("videos.db")

@@ -11,6 +11,7 @@ def get_captions(video_id):
         "subtitlesformat": "vtt",
         "skip_download": True,
         "quiet": True,
+        "no_warnings": True,
         "outtmpl": f"captions/{video_id}",
     }
 
